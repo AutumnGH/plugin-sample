@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:\\\\TheProject\\\\MessageNote\\\\plugin_edition\\\\plugin-sample\" && pnpm run build 2>&1)",
+      "Bash(cd \"D:\\\\TheProject\\\\MessageNote\\\\plugin_edition\\\\plugin-sample\" && pnpm i 2>&1)",
+      "Bash(cd \"D:\\\\TheProject\\\\MessageNote\\\\plugin_edition\\\\plugin-sample\" && pnpm i --node-linker=hoisted 2>&1)"
+    ]
+  }
+}

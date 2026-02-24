@@ -1,8 +1,8 @@
 {
-  "name": "plugin-sample",
-  "author": "Vanessa",
+  "name": "MessageNote",
+  "author": "MessageNote",
   "url": "https://github.com/siyuan-note/plugin-sample",
-  "version": "0.4.5",
+  "version": "0.1.0",
   "minAppVersion": "3.5.3",
   "backends": [
     "windows",
@@ -10,7 +10,6 @@
     "darwin",
     "ios",
     "android",
-    "harmony",
     "docker",
     "all"
   ],
@@ -24,12 +23,12 @@
   ],
   "disabledInPublish": false,
   "displayName": {
-    "default": "Plugin Sample",
-    "zh_CN": "插件示例"
+    "default": "MessageNote",
+    "zh_CN": "MessageNote"
   },
   "description": {
-    "default": "This is a plugin development sample",
-    "zh_CN": "这是一个插件开发示例"
+    "default": "Record thoughts like messages, AI generates daily notes",
+    "zh_CN": "像发消息一样记录想法，AI 自动汇总生成日记"
   },
   "readme": {
     "default": "README.md",
@@ -39,13 +38,13 @@
     "openCollective": "",
     "patreon": "",
     "github": "",
-    "custom": [
-      "https://ld246.com/sponsor"
-    ]
+    "custom": []
   },
   "keywords": [
-    "开发者参考",
-    "developer reference",
-    "示例插件"
+    "diary",
+    "message",
+    "AI",
+    "日记",
+    "消息"
   ]
 }
