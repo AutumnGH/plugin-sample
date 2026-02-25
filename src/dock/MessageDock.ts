@@ -107,9 +107,13 @@ export class MessageDock {
     private async ensureNotebook() {
         const data = await apiPost<{ notebooks: any[] }>("/api/notebook/lsNotebooks", {});
         const notebooks = data.notebooks || [];
-        const existing = notebooks.find((nb: any) => nb.name === NOTEBOOK_NAME && !nb.closed);
+        // Find by name regardless of closed status
+        const existing = notebooks.find((nb: any) => nb.name === NOTEBOOK_NAME);
         if (existing) {
             this.notebookId = existing.id;
+            if (existing.closed) {
+                await apiPost("/api/notebook/openNotebook", { notebook: existing.id });
+            }
         } else {
             const created = await apiPost<{ notebook: any }>("/api/notebook/createNotebook", { name: NOTEBOOK_NAME });
             this.notebookId = created.notebook.id;
@@ -117,10 +121,16 @@ export class MessageDock {
     }
 
     private async ensureDoc() {
+        if (!this.notebookId) throw new Error("notebookId is empty");
         const today = todayStr();
-        const rows = await apiPost<any[]>("/api/sql/query", {
-            stmt: `SELECT id FROM blocks WHERE type='d' AND box='${this.notebookId}' AND hpath='/${today}' LIMIT 1`,
-        });
+        let rows: any[] = [];
+        try {
+            rows = await apiPost<any[]>("/api/sql/query", {
+                stmt: `SELECT id FROM blocks WHERE type='d' AND box='${this.notebookId}' AND hpath='/${today}' LIMIT 1`,
+            });
+        } catch (e) {
+            console.warn("[MessageNote] ensureDoc query failed, will create doc:", e);
+        }
         if (rows && rows.length > 0) {
             this.docId = rows[0].id;
         } else {
@@ -134,9 +144,15 @@ export class MessageDock {
     }
 
     private async loadMessages() {
-        const rows = await apiPost<any[]>("/api/sql/query", {
-            stmt: `SELECT id, content, ial, created FROM blocks WHERE type='p' AND root_id='${this.docId}' AND ial LIKE '%custom-mn-type="message"%' ORDER BY created ASC`,
-        });
+        if (!this.docId) return;
+        let rows: any[] = [];
+        try {
+            rows = await apiPost<any[]>("/api/sql/query", {
+                stmt: `SELECT id, content, ial, created FROM blocks WHERE type='p' AND root_id='${this.docId}' AND ial LIKE '%custom-mn-type="message"%' ORDER BY created ASC`,
+            });
+        } catch (e) {
+            console.warn("[MessageNote] loadMessages query failed:", e);
+        }
         this.messages = (rows || []).map((row: any) => {
             const isoMatch = row.ial.match(/custom-mn-ts="([^"]+)"/);
             const isoTime = isoMatch ? isoMatch[1] : row.created;
