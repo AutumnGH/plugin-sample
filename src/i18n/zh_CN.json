@@ -18,5 +18,8 @@
     "settingApiKeyDesc": "所选提供商的 API Key",
     "settingBaseURLDesc": "API 基础地址（自定义提供商使用）",
     "settingModelDesc": "使用的模型名称",
-    "settingSystemPromptDesc": "生成日记的系统提示词"
+    "settingSystemPromptDesc": "生成日记的系统提示词",
+    "inputHint": "Enter 发送 · Shift+Enter 换行",
+    "noNotebook": "未找到可用笔记本",
+    "createDailyNoteFail": "创建 Daily Note 失败"
 }

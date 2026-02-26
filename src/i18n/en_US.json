@@ -18,5 +18,8 @@
     "settingApiKeyDesc": "Your API key for the selected provider",
     "settingBaseURLDesc": "API base URL (for custom provider)",
     "settingModelDesc": "Model name to use",
-    "settingSystemPromptDesc": "System prompt for diary generation"
+    "settingSystemPromptDesc": "System prompt for diary generation",
+    "inputHint": "Enter to send · Shift+Enter for newline",
+    "noNotebook": "No available notebook found",
+    "createDailyNoteFail": "Failed to create Daily Note"
 }

@@ -81,7 +81,7 @@ export class MessageDock {
   <div class="mn__input-area">
     <textarea class="b3-text-field mn__textarea" rows="3" placeholder="${this.i18n.sendPlaceholder}"></textarea>
     <div class="mn__actions">
-      <span class="mn__hint">Enter 发送 · Shift+Enter 换行</span>
+      <span class="mn__hint">${this.i18n.inputHint}</span>
       <button class="b3-button b3-button--text mn__send-btn">${this.i18n.send}</button>
     </div>
   </div>
@@ -197,7 +197,7 @@ export class MessageDock {
 
         try {
             if (!this.docId) {
-                await this.ensureNotebook();
+                if (!this.notebookId) await this.ensureNotebook();
                 await this.ensureDoc();
             }
             const now = new Date();
@@ -221,7 +221,7 @@ export class MessageDock {
             this.scrollToBottom();
         } catch (e) {
             console.error("[MessageNote] sendMessage error:", e);
-            showMessage(`[MessageNote] 发送失败: ${e.message}`);
+            showMessage(`[MessageNote] 发送失败: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
             this.textareaEl.disabled = false;
             this.sendBtn.disabled = false;
@@ -245,6 +245,7 @@ export class MessageDock {
         try {
             const client = new AIClient(providerCfg.baseURL, providerCfg.apiKey, providerCfg.model);
             const messagesText = this.messages.map(m => `[${m.timestamp}] ${m.content}`).join("\n");
+            showMessage(this.i18n.generating);
             const diary = await client.chat(config.systemPrompt, messagesText);
 
             // Find user's main notebook (first non-MessageNote, non-closed notebook)
@@ -252,7 +253,7 @@ export class MessageDock {
             const notebooks = data.notebooks || [];
             const mainNotebook = notebooks.find((nb: any) => nb.name !== NOTEBOOK_NAME && !nb.closed);
             if (!mainNotebook) {
-                showMessage("[MessageNote] 未找到可用笔记本");
+                showMessage(`[MessageNote] ${this.i18n.noNotebook}`);
                 return;
             }
 
@@ -261,7 +262,7 @@ export class MessageDock {
             });
             const dailyNoteId = dailyNoteResult?.id;
             if (!dailyNoteId) {
-                showMessage("[MessageNote] 创建 Daily Note 失败");
+                showMessage(`[MessageNote] ${this.i18n.createDailyNoteFail}`);
                 return;
             }
 
@@ -274,7 +275,7 @@ export class MessageDock {
             showMessage(this.i18n.generateSuccess);
         } catch (e) {
             console.error("[MessageNote] generateDiary error:", e);
-            showMessage(`${this.i18n.generateFail}: ${e.message}`);
+            showMessage(`${this.i18n.generateFail}: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
             this.aiBtn.classList.remove("mn__ai-btn--loading");
         }

@@ -16,6 +16,9 @@ export default class MessageNotePlugin extends Plugin {
 
         this.addIcons(`<symbol id="iconMessageNote" viewBox="0 0 32 32">
 <path d="M28 4H4C2.9 4 2 4.9 2 6v16c0 1.1.9 2 2 2h6l4 4 4-4h10c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-2 14H6v-2h20v2zm0-4H6v-2h20v2zm0-4H6V8h20v2z"/>
+</symbol>
+<symbol id="iconSparkles" viewBox="0 0 32 32">
+<path d="M16 2l2.5 8.5L27 13l-8.5 2.5L16 24l-2.5-8.5L5 13l8.5-2.5L16 2zm8 16l1.25 4.25L29.5 23.5l-4.25 1.25L24 29l-1.25-4.25L18.5 23.5l4.25-1.25L24 18zm-14 0l1.25 4.25L11.5 23.5l-4.25 1.25L6 29l-1.25-4.25L.5 23.5l4.25-1.25L6 18z"/>
 </symbol>`);
 
         this.addDock({
@@ -45,6 +48,9 @@ export default class MessageNotePlugin extends Plugin {
     }
 
     async onLayoutReady() {
+        // Config is loaded here (after onload) because loadData requires the
+        // kernel to be ready. initSettings() uses createActionElement lazily,
+        // so the settings panel always reads the up-to-date config when opened.
         const saved = await this.loadData(CONFIG_KEY).catch(() => null);
         if (saved) {
             this.config = this.mergeConfig(saved);
