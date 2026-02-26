@@ -21,5 +21,7 @@
     "settingSystemPromptDesc": "System prompt for diary generation",
     "inputHint": "Enter to send · Shift+Enter for newline",
     "noNotebook": "No available notebook found",
-    "createDailyNoteFail": "Failed to create Daily Note"
+    "createDailyNoteFail": "Failed to create Daily Note",
+    "diaryDateCol": "Date",
+    "diaryContentCol": "Diary Content"
 }

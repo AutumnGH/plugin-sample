@@ -21,5 +21,7 @@
     "settingSystemPromptDesc": "生成日记的系统提示词",
     "inputHint": "Enter 发送 · Shift+Enter 换行",
     "noNotebook": "未找到可用笔记本",
-    "createDailyNoteFail": "创建 Daily Note 失败"
+    "createDailyNoteFail": "创建 Daily Note 失败",
+    "diaryDateCol": "日期",
+    "diaryContentCol": "日记内容"
 }

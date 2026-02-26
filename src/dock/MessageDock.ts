@@ -1,5 +1,5 @@
 import { fetchPost, showMessage } from "siyuan";
-import { Message, MessageNoteConfig } from "../types";
+import { Message, MessageNoteConfig, newSiYuanId } from "../types";
 import { AIClient } from "../ai/AIClient";
 
 const NOTEBOOK_NAME = "MessageNote";
@@ -32,6 +32,7 @@ export class MessageDock {
     private element: HTMLElement;
     private i18n: any;
     private getConfig: () => MessageNoteConfig;
+    private saveConfig: (patch: Partial<MessageNoteConfig>) => Promise<void>;
 
     private listEl: HTMLElement;
     private textareaEl: HTMLTextAreaElement;
@@ -42,10 +43,16 @@ export class MessageDock {
     private docId = "";
     private messages: Message[] = [];
 
-    constructor(element: HTMLElement, i18n: any, getConfig: () => MessageNoteConfig) {
+    constructor(
+        element: HTMLElement,
+        i18n: any,
+        getConfig: () => MessageNoteConfig,
+        saveConfig: (patch: Partial<MessageNoteConfig>) => Promise<void>,
+    ) {
         this.element = element;
         this.i18n = i18n;
         this.getConfig = getConfig;
+        this.saveConfig = saveConfig;
     }
 
     async init() {
@@ -248,28 +255,39 @@ export class MessageDock {
             showMessage(this.i18n.generating);
             const diary = await client.chat(config.systemPrompt, messagesText);
 
-            // Find user's main notebook (first non-MessageNote, non-closed notebook)
-            const data = await apiPost<{ notebooks: any[] }>("/api/notebook/lsNotebooks", {});
-            const notebooks = data.notebooks || [];
-            const mainNotebook = notebooks.find((nb: any) => nb.name !== NOTEBOOK_NAME && !nb.closed);
-            if (!mainNotebook) {
-                showMessage(`[MessageNote] ${this.i18n.noNotebook}`);
-                return;
-            }
+            // Ensure diary database exists in MessageNote notebook
+            const { avId, dateKeyId, contentKeyId } = await this.ensureDiaryDatabase();
 
-            const dailyNoteResult = await apiPost<{ id: string }>("/api/filetree/createDailyNote", {
-                notebook: mainNotebook.id,
-            });
-            const dailyNoteId = dailyNoteResult?.id;
-            if (!dailyNoteId) {
-                showMessage(`[MessageNote] ${this.i18n.createDailyNoteFail}`);
-                return;
-            }
-
-            await apiPost("/api/block/appendBlock", {
-                parentID: dailyNoteId,
-                dataType: "markdown",
-                data: diary,
+            // Append a detached row with date + content
+            const now = new Date();
+            const dateMs = now.setHours(0, 0, 0, 0);  // midnight of today, ms
+            const blockKeyId = await this.getDiaryBlockKeyId(avId);
+            await apiPost("/api/av/appendAttributeViewDetachedBlocksWithValues", {
+                avID: avId,
+                blocksValues: [[
+                    {
+                        keyID: blockKeyId,
+                        type: "block",
+                        block: { content: todayStr(), id: "" },
+                    },
+                    {
+                        keyID: dateKeyId,
+                        type: "date",
+                        date: {
+                            content: dateMs,
+                            isNotEmpty: true,
+                            isNotTime: true,
+                            hasEndDate: false,
+                            content2: 0,
+                            isNotEmpty2: false,
+                        },
+                    },
+                    {
+                        keyID: contentKeyId,
+                        type: "text",
+                        text: { content: diary },
+                    },
+                ]],
             });
 
             showMessage(this.i18n.generateSuccess);
@@ -279,5 +297,126 @@ export class MessageDock {
         } finally {
             this.aiBtn.classList.remove("mn__ai-btn--loading");
         }
+    }
+
+    /**
+     * Ensures the diary index page and database exist in the MessageNote notebook.
+     * Creates them on first run and persists avId/docId to config.
+     * Returns the avId and column key IDs.
+     */
+    private async ensureDiaryDatabase(): Promise<{ avId: string; dateKeyId: string; contentKeyId: string }> {
+        const config = this.getConfig();
+
+        // If we already have a valid avId, verify it still exists
+        if (config.diaryAvId) {
+            try {
+                const av = await apiPost<{ av: any }>("/api/av/getAttributeView", { id: config.diaryAvId });
+                if (av?.av) {
+                    // AV exists — retrieve key IDs from it
+                    const keys = await apiPost<any[]>("/api/av/getAttributeViewKeys", { id: config.diaryDocId });
+                    const dateKey = (keys || []).find((k: any) => k.key?.type === "date");
+                    const contentKey = (keys || []).find((k: any) => k.key?.type === "text");
+                    if (dateKey && contentKey) {
+                        return { avId: config.diaryAvId, dateKeyId: dateKey.key.id, contentKeyId: contentKey.key.id };
+                    }
+                }
+            } catch (_) {
+                // AV gone — fall through to recreate
+            }
+        }
+
+        // Ensure notebook exists
+        if (!this.notebookId) await this.ensureNotebook();
+
+        // Create or find the diary index page
+        const DIARY_PATH = "/DiaryDatabase";
+        let diaryDocId = "";
+        try {
+            const rows = await apiPost<any[]>("/api/sql/query", {
+                stmt: `SELECT id FROM blocks WHERE type='d' AND box='${this.notebookId}' AND hpath='${DIARY_PATH}' LIMIT 1`,
+            });
+            if (rows && rows.length > 0) diaryDocId = rows[0].id;
+        } catch (_) { /* ignore */ }
+
+        // Generate IDs for the new database block and columns
+        const avId = newSiYuanId();
+        const dateKeyId = newSiYuanId();
+        const contentKeyId = newSiYuanId();
+
+        if (!diaryDocId) {
+            // Create the diary index page with the database block embedded
+            const dbDom = `<div data-node-id="${newSiYuanId()}" data-type="NodeAttributeView" data-av-id="${avId}" data-av-type="table" class="av"></div>`;
+            diaryDocId = await apiPost<string>("/api/filetree/createDocWithMd", {
+                notebook: this.notebookId,
+                path: DIARY_PATH,
+                markdown: "",
+            });
+            // Append the database block as DOM
+            await apiPost("/api/block/appendBlock", {
+                parentID: diaryDocId,
+                dataType: "dom",
+                data: dbDom,
+            });
+        } else {
+            // Page exists — check if it already has a database block
+            const children = await apiPost<any[]>("/api/block/getChildBlocks", { id: diaryDocId });
+            const existingAv = (children || []).find((b: any) => b.type === "av");
+            if (existingAv) {
+                // Use the existing AV — get its avId from block attrs
+                const attrs = await apiPost<Record<string, string>>("/api/attr/getBlockAttrs", { id: existingAv.id });
+                const existingAvId = attrs?.["av-id"] || "";
+                if (existingAvId) {
+                    // Retrieve key IDs
+                    const keys = await apiPost<any[]>("/api/av/getAttributeViewKeys", { id: existingAv.id });
+                    const dateKey = (keys || []).find((k: any) => k.key?.type === "date");
+                    const contentKey = (keys || []).find((k: any) => k.key?.type === "text");
+                    if (dateKey && contentKey) {
+                        await this.saveConfig({ diaryAvId: existingAvId, diaryDocId });
+                        return { avId: existingAvId, dateKeyId: dateKey.key.id, contentKeyId: contentKey.key.id };
+                    }
+                }
+            } else {
+                // Page exists but no AV block — insert one
+                const dbDom = `<div data-node-id="${newSiYuanId()}" data-type="NodeAttributeView" data-av-id="${avId}" data-av-type="table" class="av"></div>`;
+                await apiPost("/api/block/appendBlock", {
+                    parentID: diaryDocId,
+                    dataType: "dom",
+                    data: dbDom,
+                });
+            }
+        }
+
+        // Add date column
+        await apiPost("/api/av/addAttributeViewKey", {
+            avID: avId,
+            keyID: dateKeyId,
+            keyName: this.i18n.diaryDateCol,
+            keyType: "date",
+            keyIcon: "",
+            previousKeyID: "",
+        });
+
+        // Add content column
+        await apiPost("/api/av/addAttributeViewKey", {
+            avID: avId,
+            keyID: contentKeyId,
+            keyName: this.i18n.diaryContentCol,
+            keyType: "text",
+            keyIcon: "",
+            previousKeyID: dateKeyId,
+        });
+
+        // Persist to config
+        await this.saveConfig({ diaryAvId: avId, diaryDocId });
+
+        return { avId, dateKeyId, contentKeyId };
+    }
+
+    /** Get the primary block key ID of an attribute view. */
+    private async getDiaryBlockKeyId(avId: string): Promise<string> {
+        const config = this.getConfig();
+        const keys = await apiPost<any[]>("/api/av/getAttributeViewKeys", { id: config.diaryDocId });
+        const blockKey = (keys || []).find((k: any) => k.key?.type === "block");
+        return blockKey?.key?.id || "";
     }
 }

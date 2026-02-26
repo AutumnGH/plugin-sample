@@ -35,7 +35,13 @@ export default class MessageNotePlugin extends Plugin {
                 const dockInstance = new MessageDock(
                     dock.element,
                     this.i18n,
-                    () => this.config
+                    () => this.config,
+                    async (patch) => {
+                        this.config = { ...this.config, ...patch };
+                        await this.saveData(CONFIG_KEY, this.config).catch(e => {
+                            console.error("[MessageNote] saveConfig error:", e);
+                        });
+                    },
                 );
                 dockInstance.init();
             },
